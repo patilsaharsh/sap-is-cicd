@@ -6,33 +6,43 @@ on:
 jobs:
   authenticate:
     runs-on: ubuntu-latest
-
     environment: DEV
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Runner Information
-        run: |
-          echo "Runner is working!"
-          uname -a
-          pwd
-          ls -la
-
-      - name: Verify GitHub Secrets
+      - name: Authenticate with SAP
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
           TOKEN_URL: ${{ secrets.TOKEN_URL }}
         run: |
-          if [ -z "$CLIENT_ID" ]; then
-            echo "CLIENT_ID Secret Missing"
+
+          echo "Authenticating with SAP..."
+
+          RESPONSE=$(curl -s -X POST "$TOKEN_URL" \
+            -u "$CLIENT_ID:$CLIENT_SECRET" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=client_credentials")
+
+          echo "$RESPONSE" > response.json
+
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y jq
+          fi
+
+          TOKEN=$(jq -r '.access_token' response.json)
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Authentication Failed"
+            cat response.json
             exit 1
           fi
 
-          if [ -z "$TOKEN_URL" ]; then
-            echo "TOKEN_URL Secret Missing"
-            exit 1
-          fi
+          echo "::add-mask::$TOKEN"
+          echo "ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
 
-          echo "Secrets loaded successfully"
+          echo "Authentication Successful"
+          echo "Token received successfully."
