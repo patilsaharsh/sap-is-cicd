@@ -1,16 +1,38 @@
-name: Module 2 - Authentication
+name: Module 2 - SAP Authentication
 
 on:
   workflow_dispatch:
 
 jobs:
-  auth:
+  authenticate:
     runs-on: ubuntu-latest
+
     environment: DEV
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Test Connection
+      - name: Runner Information
         run: |
-          echo "GitHub Action is running successfully."
+          echo "Runner is working!"
+          uname -a
+          pwd
+          ls -la
+
+      - name: Verify GitHub Secrets
+        env:
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          TOKEN_URL: ${{ secrets.TOKEN_URL }}
+        run: |
+          if [ -z "$CLIENT_ID" ]; then
+            echo "CLIENT_ID Secret Missing"
+            exit 1
+          fi
+
+          if [ -z "$TOKEN_URL" ]; then
+            echo "TOKEN_URL Secret Missing"
+            exit 1
+          fi
+
+          echo "Secrets loaded successfully"
