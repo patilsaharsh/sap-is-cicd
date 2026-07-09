@@ -1,0 +1,14 @@
+name: Module 4 - Download Integration Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      packageId:
+        description: "Integration Package ID"
+        required: true
+        default: "MaterialMaster"
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    environment: DEV
