@@ -1,0 +1,48 @@
+name: Module 3 - Discover Integration Packages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+
+    environment: DEV
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate
+        env:
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          TOKEN_URL: ${{ secrets.TOKEN_URL }}
+        run: |
+
+          RESPONSE=$(curl -s \
+            -X POST "$TOKEN_URL" \
+            -u "$CLIENT_ID:$CLIENT_SECRET" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=client_credentials")
+
+          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Authentication Failed"
+            exit 1
+          fi
+
+          echo "::add-mask::$TOKEN"
+          echo "ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
+
+      - name: List Packages
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+
+          echo "Integration Packages"
+
+          curl -s \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Accept: application/json" \
+            "$API_URL/api/v1/IntegrationPackages"
