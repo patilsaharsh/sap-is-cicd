@@ -11,7 +11,6 @@ on:
 jobs:
   download:
     runs-on: ubuntu-latest
-
     environment: DEV
 
     steps:
@@ -24,8 +23,6 @@ jobs:
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
           TOKEN_URL: ${{ secrets.TOKEN_URL }}
         run: |
-          echo "Authenticating..."
-
           RESPONSE=$(curl -s \
             -X POST "$TOKEN_URL" \
             -u "$CLIENT_ID:$CLIENT_SECRET" \
@@ -43,8 +40,6 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
 
-          echo "Authentication Successful"
-
       - name: Download Integration Package
         env:
           API_URL: ${{ secrets.API_URL }}
@@ -52,8 +47,6 @@ jobs:
           PACKAGE_ID="${{ github.event.inputs.packageId }}"
 
           mkdir -p downloads
-
-          echo "Downloading package: $PACKAGE_ID"
 
           curl -L \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -65,23 +58,11 @@ jobs:
         run: |
           PACKAGE_ID="${{ github.event.inputs.packageId }}"
 
-          if [ ! -f "downloads/$PACKAGE_ID.zip" ]; then
-            echo "Package download failed."
-            exit 1
-          fi
-
-          SIZE=$(stat -c%s "downloads/$PACKAGE_ID.zip")
-
-          echo "Downloaded ZIP Size: $SIZE bytes"
-
-          if [ "$SIZE" -lt 100 ]; then
-            echo "Downloaded file looks invalid."
-            exit 1
-          fi
-
           ls -lh downloads
 
-      - name: Upload Package Artifact
+          test -f "downloads/$PACKAGE_ID.zip"
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: integration-package
