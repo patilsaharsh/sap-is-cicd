@@ -1,4 +1,4 @@
-name: Module 4 - Download Integration Package
+name: Module 4 - Download and Extract Integration Package
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
         default: "MaterialMaster"
 
 jobs:
-  download:
+  download-and-extract:
     runs-on: ubuntu-latest
     environment: DEV
 
@@ -23,6 +23,8 @@ jobs:
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
           TOKEN_URL: ${{ secrets.TOKEN_URL }}
         run: |
+          echo "Authenticating..."
+
           RESPONSE=$(curl -s \
             -X POST "$TOKEN_URL" \
             -u "$CLIENT_ID:$CLIENT_SECRET" \
@@ -40,6 +42,8 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
 
+          echo "Authentication Successful"
+
       - name: Download Integration Package
         env:
           API_URL: ${{ secrets.API_URL }}
@@ -47,6 +51,8 @@ jobs:
           PACKAGE_ID="${{ github.event.inputs.packageId }}"
 
           mkdir -p downloads
+
+          echo "Downloading package: $PACKAGE_ID"
 
           curl -L \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -58,12 +64,73 @@ jobs:
         run: |
           PACKAGE_ID="${{ github.event.inputs.packageId }}"
 
+          if [ ! -f "downloads/$PACKAGE_ID.zip" ]; then
+            echo "Package download failed."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "downloads/$PACKAGE_ID.zip")
+
+          echo "ZIP Size: $SIZE bytes"
+
+          if [ "$SIZE" -lt 100 ]; then
+            echo "Downloaded file looks invalid."
+            exit 1
+          fi
+
           ls -lh downloads
 
-          test -f "downloads/$PACKAGE_ID.zip"
+      - name: Install unzip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
 
-      - name: Upload Artifact
+      - name: Extract Package
+        run: |
+          PACKAGE_ID="${{ github.event.inputs.packageId }}"
+
+          mkdir -p extracted
+
+          unzip "downloads/$PACKAGE_ID.zip" -d extracted
+
+          echo "Extraction completed."
+
+      - name: Show Extracted Structure
+        run: |
+          echo "=============================="
+          echo "Extracted Package Structure"
+          echo "=============================="
+
+          find extracted
+
+      - name: Display Metadata
+        run: |
+          echo "=============================="
+          echo "ExportInformation.info"
+          echo "=============================="
+
+          if [ -f extracted/ExportInformation.info ]; then
+            cat extracted/ExportInformation.info
+          fi
+
+          echo ""
+
+          echo "=============================="
+          echo "contentmetadata"
+          echo "=============================="
+
+          if [ -f extracted/contentmetadata ]; then
+            cat extracted/contentmetadata
+          fi
+
+      - name: Upload ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: integration-package
+          name: package-zip
           path: downloads/*.zip
+
+      - name: Upload Extracted Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: extracted-package
+          path: extracted/**
