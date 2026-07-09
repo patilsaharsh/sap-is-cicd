@@ -1,48 +1,48 @@
-name: Module 2 - SAP Authentication
+name: Module 3 - Discover Integration Packages
 
 on:
   workflow_dispatch:
 
 jobs:
-  authenticate:
+  discover:
     runs-on: ubuntu-latest
+
     environment: DEV
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Authenticate with SAP
+      - name: Authenticate
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
           TOKEN_URL: ${{ secrets.TOKEN_URL }}
         run: |
 
-          echo "Authenticating with SAP..."
-
-          RESPONSE=$(curl -s -X POST "$TOKEN_URL" \
+          RESPONSE=$(curl -s \
+            -X POST "$TOKEN_URL" \
             -u "$CLIENT_ID:$CLIENT_SECRET" \
             -H "Content-Type: application/x-www-form-urlencoded" \
             -d "grant_type=client_credentials")
 
-          echo "$RESPONSE" > response.json
-
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y jq
-          fi
-
-          TOKEN=$(jq -r '.access_token' response.json)
+          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
 
           if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
             echo "Authentication Failed"
-            cat response.json
             exit 1
           fi
 
           echo "::add-mask::$TOKEN"
           echo "ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
 
-          echo "Authentication Successful"
-          echo "Token received successfully."
+      - name: List Packages
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+
+          echo "Integration Packages"
+
+          curl -s \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Accept: application/json" \
+            "$API_URL/api/v1/IntegrationPackages"
