@@ -1,0 +1,60 @@
+name: Module 5 - List Package Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      packageId:
+        description: "Integration Package ID"
+        required: true
+        default: "MaterialMaster"
+
+jobs:
+  list-artifacts:
+    runs-on: ubuntu-latest
+    environment: DEV
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate
+        env:
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          TOKEN_URL: ${{ secrets.TOKEN_URL }}
+        run: |
+          RESPONSE=$(curl -s \
+            -X POST "$TOKEN_URL" \
+            -u "$CLIENT_ID:$CLIENT_SECRET" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=client_credentials")
+
+          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Authentication Failed"
+            exit 1
+          fi
+
+          echo "::add-mask::$TOKEN"
+          echo "ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
+
+      - name: List Design Time Artifacts
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          PACKAGE_ID="${{ github.event.inputs.packageId }}"
+
+          curl -s \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Accept: application/xml" \
+            "$API_URL/api/v1/IntegrationPackages('$PACKAGE_ID')/IntegrationDesigntimeArtifacts" \
+            -o artifacts.xml
+
+          cat artifacts.xml
+
+      - name: Upload Artifact List
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-list
+          path: artifacts.xml
