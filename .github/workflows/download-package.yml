@@ -1,0 +1,69 @@
+name: Module 4 - Download Integration Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      packageId:
+        description: "Integration Package ID"
+        required: true
+        default: "MaterialMaster"
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    environment: DEV
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate with SAP
+        env:
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          TOKEN_URL: ${{ secrets.TOKEN_URL }}
+        run: |
+          RESPONSE=$(curl -s \
+            -X POST "$TOKEN_URL" \
+            -u "$CLIENT_ID:$CLIENT_SECRET" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=client_credentials")
+
+          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Authentication Failed"
+            echo "$RESPONSE"
+            exit 1
+          fi
+
+          echo "::add-mask::$TOKEN"
+          echo "ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
+
+      - name: Download Integration Package
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          PACKAGE_ID="${{ github.event.inputs.packageId }}"
+
+          mkdir -p downloads
+
+          curl -L \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "$API_URL/api/v1/IntegrationPackages('$PACKAGE_ID')/\$value" \
+            --output "downloads/$PACKAGE_ID.zip"
+
+      - name: Verify Download
+        run: |
+          PACKAGE_ID="${{ github.event.inputs.packageId }}"
+
+          ls -lh downloads
+
+          test -f "downloads/$PACKAGE_ID.zip"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-package
+          path: downloads/*.zip
